@@ -1,21 +1,12 @@
-# This Python 3 environment comes with many helpful analytics libraries installed
-# It is defined by the kaggle/python docker image: https://github.com/kaggle/docker-python
-# For example, here's several helpful packages to load in 
-
-import numpy as np # linear algebra
-import pandas as pd # data processing, CSV file I/O (e.g. pd.read_csv)
+import numpy as np
+import pandas as pd
 from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import LabelEncoder, OneHotEncoder
 from sklearn.compose import ColumnTransformer
-
-# Input data files are available in the "../input/" directory.
-# For example, running this (by clicking run or pressing Shift+Enter) will list all files under the input directory
-
-train_data = pd.read_csv("/kaggle/input/titanic/train.csv")
-test_data = pd.read_csv("/kaggle/input/titanic/test.csv")
+from sklearn.model_selection import train_test_split
+from sklearn import preprocessing
 
 def pre_process(data):
-    
     # remove extraneous columns: Name, TicketNo, Cabin (Cabin could potentially be useful if it could be mapped to a location on the ship)
     data = data.drop(['Name','Ticket','Cabin'], axis=1)
     
@@ -32,33 +23,47 @@ def pre_process(data):
     labelencoder = LabelEncoder()
     X[:, 2] = labelencoder.fit_transform(X[:, 2])
     
-    # one-hot encode embarkation port...
+    # remove passengerId. one-hot encode ticket class, embarkation port...
     columnTransformer = ColumnTransformer(
-        [('passthrough', 'passthrough', [0,1,2,3,4,5,6]),
-         ('one-hot', OneHotEncoder(), [7]),
+        [('passthrough', 'passthrough', [2,3,4,5,6]),
+         ('one-hot', OneHotEncoder(), [1,7]),
         ])
     X = columnTransformer.fit_transform(X)
     
-    # TODO: one-hot ticket class
-    
-    # TODO: feature normalization
+    # feature normalization
+    scaler = preprocessing.MinMaxScaler()
+    X = scaler.fit_transform(X)
     
     return X
+
+def local_dev():
+    # split some of the training data off as test data because the Kaggle supplied test data has no y value to verify on...
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.20, random_state=0)
+    
+    lr = LogisticRegression(random_state=0, solver='lbfgs', max_iter=1000).fit(X_train, y_train)
+    score = lr.score(X_test, y_test)
+    print(score)
+
+def submission():
+    X_test_kaggle = pre_process(kaggle_test_data)
+    kaggle_test_passenger_ids = kaggle_test_data['PassengerId'].values
+    
+    lr = LogisticRegression(random_state=0, solver='liblinear', max_iter=1000).fit(X, y)
+    predictions = lr.predict(X_test_kaggle)
+    predictions = np.concatenate([kaggle_test_passenger_ids.reshape(-1,1), predictions.reshape(-1,1)], axis=1)
+    out = pd.DataFrame(data=predictions, columns=['PassengerId','Survived'])
+    out.to_csv('out.csv', index = False)
+    
+
+train_data = pd.read_csv("/kaggle/input/titanic/train.csv")
+kaggle_test_data = pd.read_csv("/kaggle/input/titanic/test.csv")
 
 # extract our ground truth...
 y = train_data.values[:,1]
 y = y.astype('int')  # y datatype was 'object'
-
 train_data = train_data.drop(['Survived'], axis=1)
 
 X = pre_process(train_data)
-X_test = pre_process(test_data)
 
-lr = LogisticRegression(random_state=0, solver='liblinear', max_iter=500).fit(X, y)
-predictions = lr.predict(X_test)
-
-predictions = np.concatenate([X_test[:,0].reshape(-1,1), predictions.reshape(-1,1)], axis=1)
-
-out = pd.DataFrame(data=predictions, columns=['PassengerId','Survived'])
-print(out)
-out.to_csv('out.csv', index = False)
+local_dev()
+#submission()
