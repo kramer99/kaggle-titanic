@@ -9,3 +9,4 @@ These are intended to be run within a Kaggle notebook.
 
 - [Support Vector Machine](svm.py) Achieved 0.7799 with this one
 
+- [Neural Network](nn.py) First effort at neural network didn't do too well: 0.7751
